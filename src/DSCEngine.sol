@@ -1,3 +1,25 @@
+// version
+// Layout of Contract:
+// imports
+// errors
+// interfaces, libraries, contracts
+// Type declarations
+// State variables
+// Events
+// Modifiers
+// Functions
+
+// Layout of Functions:
+// constructor
+// receive function (if exists)
+// fallback function (if exists)
+// external
+// public
+// internal
+// private
+// internal & private view & pure functions
+// external & public view & pure functions
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
@@ -22,9 +44,10 @@ pragma solidity ^0.8.27;
  * @notice This contract is very loosely based on MakerDAO DSS (DAI) system.
  */
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {DecentralizedStablecoin} from "./DecentralizedStablecoin.sol";
 import {Errors} from "./Errors.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DSCEngine is ReentrancyGuard, Errors {
     /*//////////////////////////////////////////////////////////////
@@ -48,10 +71,16 @@ contract DSCEngine is ReentrancyGuard, Errors {
     /*//////////////////////////////////////////////////////////////
                                STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
+    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 private constant PRECISION = 1e18;
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% overcollateralized
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
 
     mapping(address token => address priceFeed) private s_priceFeeds;
     mapping(address user => mapping(address token => uint256 collateralAmount)) private s_collateralDeposited;
     mapping(address user => uint256 dscAmount) private s_amountDscMinted;
+    address[] private s_collateralTokens;
 
     DecentralizedStablecoin public immutable i_dsc;
 
@@ -73,7 +102,8 @@ contract DSCEngine is ReentrancyGuard, Errors {
         }
 
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
-            s_priceFeeds[tokenAddresses[i]] = s_priceFeeds[priceFeedAddresses[i]];
+            s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
+            s_collateralTokens.push(tokenAddresses[i]);
         }
 
         i_dsc = DecentralizedStablecoin(dscAddress);
@@ -118,20 +148,63 @@ contract DSCEngine is ReentrancyGuard, Errors {
      * @notice User must more collateral value than the threhold
      */
     function mintDsc(uint256 amountDcsToMint) external {
-        // checks
-        // health factor
-        _revertIfHealthFactorBroken();
-
-        // effects
         s_amountDscMinted[msg.sender] += amountDcsToMint;
-
-        // interactions
-
+        _revertIfHealthFactorBroken(msg.sender);
+        bool success = i_dsc.mint(msg.sender, amountDcsToMint);
+        if (!success) {
+            revert DSCEngine_MintFailed();
+        }
     }
 
     function burnDsc() external {}
 
     function liquidate() external {}
 
-    function getHealthFactor() external view {}
+    /*//////////////////////////////////////////////////////////////
+                        Private & Internal View FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _revertIfHealthFactorBroken(address user) internal {
+        uint256 userHealthFactor = _calculateHealthFactor(user);
+        if (userHealthFactor < MIN_HEALTH_FACTOR) {
+            revert DSCEngine_BreaksHealthFactor(userHealthFactor);
+        }
+    }
+
+    function _calculateHealthFactor(address user) internal view returns (uint256) {
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
+        // healthFactor = collateralValueInUsd / totalDscMinted;
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+        return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted; // true health factor
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Public & External FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _getAccountInformation(address user)
+        internal
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
+        totalDscMinted = s_amountDscMinted[user];
+        collateralValueInUsd = getAccountCollateralValueInUsd(user);
+    }
+
+    function getAccountCollateralValueInUsd(address user) public view returns (uint256 totalCollateralValueInUsd) {
+        // маю пройтись по масиву із всіх collateralTokens, перевести їх у usdValue і тоді сумую всіх
+        for (uint256 i = 0; i < s_collateralTokens.length; i++) {
+            address token = s_collateralTokens[i];
+            uint256 amount = s_collateralDeposited[user][token];
+            // сумуються всі значення в usd для кожного токена
+            totalCollateralValueInUsd += getUsdValue(token, amount);
+            // totalCollateralValueInUsd = totalCollateralValueInUsd + getUsdValue(token, amount);
+        }
+    }
+
+    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
+        (, int256 price,,,) = priceFeed.latestRoundData();
+        return (uint256(price) * ADDITIONAL_FEED_PRECISION * amount) / PRECISION;
+    }
 }

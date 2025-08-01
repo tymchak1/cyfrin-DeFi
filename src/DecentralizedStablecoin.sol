@@ -39,14 +39,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Errors} from "./Errors.sol";
 
 contract DecentralizedStablecoin is ERC20, ERC20Burnable, Ownable, Errors {
-    constructor(
-        address initialOwner
-    ) ERC20("DecentralizedStablecoin", "DSC") Ownable(initialOwner) {}
+    constructor(address initialOwner) ERC20("DecentralizedStablecoin", "DSC") Ownable(initialOwner) {}
 
-    function mint(
-        address _to,
-        uint256 _amount
-    ) public onlyOwner returns (bool) {
+    function mint(address _to, uint256 _amount) public onlyOwner returns (bool) {
         if (_to == address(0)) {
             revert DecentralizedStablecoin_NotZeroAddress();
         }
