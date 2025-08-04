@@ -2,12 +2,12 @@
 pragma solidity ^0.8.27;
 
 abstract contract Errors {
-    error DecentralizedStablecoin_MustBeMoreThatZero();
+    error DecentralizedStablecoin_MustBeMoreThanZero();
     error DecentralizedStablecoin_AmountExceedsBalance();
     error DecentralizedStablecoin_NotZeroAddress();
 
     error DSCEngine_NotZeroAddress();
-    error DSCEngine_MustBeMoreThatZero();
+    error DSCEngine_MustBeMoreThanZero();
     error DSCEngine_TokenAddressesAndPriceFeedAddressesMustBeTheSameLength();
     error DSCEngine_TokenIsNotAllowed();
     error DSCEngine_TransferFailed();
