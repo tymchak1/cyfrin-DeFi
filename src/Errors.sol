@@ -11,7 +11,7 @@ abstract contract Errors {
     error DSCEngine_TokenAddressesAndPriceFeedAddressesMustBeTheSameLength();
     error DSCEngine_TokenIsNotAllowed();
     error DSCEngine_TransferFailed();
-    error DSCEngine_BreaksHealthFactor(uint256 userHealthFactor);
+    error DSCEngine_BreaksHealthFactor();
     error DSCEngine_MintFailed();
     error DSCEngine_UserHealthFactorIsNotBroken();
     error DSCEngine_HealthFactorNotImproved();
