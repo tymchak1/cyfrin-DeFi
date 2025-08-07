@@ -15,4 +15,6 @@ abstract contract Errors {
     error DSCEngine_MintFailed();
     error DSCEngine_UserHealthFactorIsNotBroken();
     error DSCEngine_HealthFactorNotImproved();
+    error DSCEngine_InsufficientCollateralBalance();
+    error DSCEngine_RedeemValueGreaterThanCollateral();
 }

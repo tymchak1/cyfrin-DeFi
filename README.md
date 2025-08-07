@@ -6,3 +6,10 @@
 3) Collateral - exogenous (Crypto)
     1. wETH
     2. wBTC
+
+
+1. What are our invatiants/properties?
+2. Write functions.
+
+    fuzzing = stateless fuzzing
+    invariant = stateful fuzzing
