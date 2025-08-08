@@ -469,4 +469,38 @@ contract DSCEngineTest is Test, Errors {
         assertEq(dscMinted2, 3_000e18);
         assertGt(collateralValue2, 0);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                             Getters TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testGetAccountCollateralValueInUsd() public depositedCollateral {
+        uint256 expectedValue = dscEngine.getUsdValue(weth, AMOUNT_COLLATERAL);
+        uint256 actualValue = dscEngine.getAccountCollateralValueInUsd(USER);
+        assertEq(expectedValue, actualValue);
+    }
+
+    function testGetAccountInformation() public depositedCollateral {
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dscEngine.getAccountInformation(USER);
+        assertEq(totalDscMinted, 0);
+        assertEq(collateralValueInUsd, dscEngine.getUsdValue(weth, AMOUNT_COLLATERAL));
+    }
+
+    function testGetUserHealthFactor_NoDebt() public depositedCollateral {
+        uint256 hf = dscEngine.getUserHealthFactor(USER);
+        assertEq(hf, type(uint256).max);
+    }
+
+    function testGetCollateralDeposited() public depositedCollateral {
+        uint256 depositedAmount = dscEngine.getCollateralDeposited(USER, weth);
+        assertEq(depositedAmount, AMOUNT_COLLATERAL);
+    }
+
+    function testCalculateHealthFactor() public view {
+        uint256 collateralValueInUsd = 2000 ether;
+        uint256 debt = 1000 ether;
+        uint256 expectedHF = (collateralValueInUsd * LIQUIDATION_THRESHOLD / LIQUIDATION_PRECISION) * 1e18 / debt;
+        uint256 actualHF = dscEngine.calculateHealthFactor(debt, collateralValueInUsd);
+        assertEq(expectedHF, actualHF);
+    }
 }

@@ -381,8 +381,12 @@ contract DSCEngine is ReentrancyGuard, Errors {
         for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
             uint256 amount = s_collateralDeposited[user][token];
+            uint256 value = getUsdValue(token, amount);
 
-            totalCollateralValueInUsd += getUsdValue(token, amount);
+            if (totalCollateralValueInUsd + value < totalCollateralValueInUsd) {
+                revert DSCEngine_CollateralValueOverflow();
+            }
+            totalCollateralValueInUsd += value;
         }
     }
 
@@ -414,5 +418,9 @@ contract DSCEngine is ReentrancyGuard, Errors {
         returns (uint256)
     {
         return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
+    }
+
+    function getCollateralTokens() external view returns (address[] memory) {
+        return s_collateralTokens;
     }
 }
