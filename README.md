@@ -13,3 +13,7 @@
 
     fuzzing = stateless fuzzing
     invariant = stateful fuzzing
+
+1. Proper oracle use ✅
+2. More tests
+3. Smart Contract Audit Preparations

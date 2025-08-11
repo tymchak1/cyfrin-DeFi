@@ -5,6 +5,7 @@ import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import {Test} from "forge-std/Test.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStablecoin} from "../../src/DecentralizedStablecoin.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 
 contract Handler is Test {
     DSCEngine dscEngine;
@@ -19,6 +20,7 @@ contract Handler is Test {
     uint256 private constant LIQUIDATION_PRECISION = 100;
 
     address[] public userWithCollaterallDeposited;
+    MockV3Aggregator public ethPriceFeed;
 
     constructor(DSCEngine _dscEngine, DecentralizedStablecoin _dsc) {
         dscEngine = _dscEngine;
@@ -27,6 +29,8 @@ contract Handler is Test {
         address[] memory collateralTokens = dscEngine.getCollateralTokens();
         weth = ERC20Mock(collateralTokens[0]);
         wbtc = ERC20Mock(collateralTokens[1]);
+
+        ethPriceFeed = MockV3Aggregator(dscEngine.getCollateralTokenPriceFeed(address(weth)));
     }
 
     function mintDsc(uint256 amount, uint256 addressSeed) public {
@@ -77,6 +81,13 @@ contract Handler is Test {
     //         return;
     //     }
     //     dscEngine.redeemCollateral(address(collateral), amountCollateral);
+    // }
+
+    // If price falls quickly - we are busted
+    // Breaks Invariant
+    // function updateCollateralPrice(uint96 newPrice) public {
+    //     int256 newPriceInt = int256(uint256(newPrice));
+    //     ethPriceFeed.updateAnswer(newPriceInt);
     // }
 
     /*//////////////////////////////////////////////////////////////

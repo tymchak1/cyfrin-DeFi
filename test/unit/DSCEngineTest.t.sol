@@ -81,6 +81,21 @@ contract DSCEngineTest is Test, Errors {
         uint256 actualWeth = dscEngine.getTokenAmountFromUsd(address(weth), usdAmount);
         assertEq(expectedWeth, actualWeth);
     }
+
+    function testGetTokenAmountFromUsdWithZeroPrice() public {
+        MockV3Aggregator(ethUsdPriceFeed).updateAnswer(0);
+        uint256 usdAmount = 100 ether;
+
+        vm.expectRevert();
+        dscEngine.getTokenAmountFromUsd(weth, usdAmount);
+    }
+
+    function testGetUsdValueForWbtc() public view {
+        uint256 amount = 1 ether;
+        uint256 value = dscEngine.getUsdValue(wbtc, amount);
+        assertGt(value, 0);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         depositCollateral TESTS
     //////////////////////////////////////////////////////////////*/
@@ -166,6 +181,17 @@ contract DSCEngineTest is Test, Errors {
     function testRedeemCollateralRevertsIfAmountIsZero() public {
         vm.expectRevert(DSCEngine_MustBeMoreThanZero.selector);
         dscEngine.redeemCollateral(weth, 0);
+    }
+
+    function testRedeemCollateralRevertsIfInsufficientBalance() public depositedCollateral {
+        uint256 tooMuchCollateral = AMOUNT_COLLATERAL + 1 ether;
+        vm.expectRevert(DSCEngine_InsufficientCollateralBalance.selector);
+        dscEngine.redeemCollateral(weth, tooMuchCollateral);
+    }
+
+    function testRedeemCollateralRevertsIfRedeemValueGreaterThanCollateral() public depositedCollateral {
+        vm.expectRevert(DSCEngine_InsufficientCollateralBalance.selector);
+        dscEngine.redeemCollateral(weth, AMOUNT_COLLATERAL + 1);
     }
 
     function testRedeemCollateralWorksCorrectly() public depositedCollateral {
@@ -471,6 +497,54 @@ contract DSCEngineTest is Test, Errors {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        BOUNDARY CONDITIONS TESTS  
+    //////////////////////////////////////////////////////////////*/
+
+    function testMintDscExactlyAtHealthFactorLimit() public {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
+        dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
+
+        // Calculate exact maximum mintable amount
+        uint256 collateralValue = dscEngine.getAccountCollateralValueInUsd(USER);
+        uint256 maxMintable = (collateralValue * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+
+        // Should succeed
+        dscEngine.mintDsc(maxMintable);
+
+        // Health factor should be exactly 1e18
+        uint256 healthFactor = dscEngine.getUserHealthFactor(USER);
+        assertEq(healthFactor, 1e18);
+
+        vm.stopPrank();
+    }
+
+    function testRedeemCollateralExactlyAtHealthFactorLimit() public {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
+        dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
+
+        uint256 mintAmount = 5000e18;
+        dscEngine.mintDsc(mintAmount);
+
+        // Calculate maximum redeemable amount that keeps health factor >= 1e18
+        uint256 currentCollateralValue = dscEngine.getAccountCollateralValueInUsd(USER);
+        uint256 requiredCollateralValue = (mintAmount * LIQUIDATION_PRECISION) / LIQUIDATION_THRESHOLD;
+        uint256 excessCollateralValue = currentCollateralValue - requiredCollateralValue;
+        uint256 maxRedeemable = dscEngine.getTokenAmountFromUsd(weth, excessCollateralValue);
+
+        // Should succeed
+        dscEngine.redeemCollateral(weth, maxRedeemable);
+
+        // Health factor should be approximately 1e18 (within rounding)
+        uint256 healthFactor = dscEngine.getUserHealthFactor(USER);
+        assertGe(healthFactor, 1e18);
+        assertLe(healthFactor, 1e18 + 1e15); // Allow for small rounding differences
+
+        vm.stopPrank();
+    }
+
+    /*//////////////////////////////////////////////////////////////
                              Getters TESTS
     //////////////////////////////////////////////////////////////*/
 
@@ -502,5 +576,45 @@ contract DSCEngineTest is Test, Errors {
         uint256 expectedHF = (collateralValueInUsd * LIQUIDATION_THRESHOLD / LIQUIDATION_PRECISION) * 1e18 / debt;
         uint256 actualHF = dscEngine.calculateHealthFactor(debt, collateralValueInUsd);
         assertEq(expectedHF, actualHF);
+    }
+
+    function testGetCollateralTokensReturnsCorrectList() public view {
+        address[] memory tokens = dscEngine.getCollateralTokens();
+        assertEq(tokens[0], weth);
+    }
+
+    function testGetCollateralTokenPriceFeedReturnsCorrectAddress() public view {
+        address feed = dscEngine.getCollateralTokenPriceFeed(weth);
+        assertEq(feed, ethUsdPriceFeed);
+    }
+
+    function testCalculateHealthFactorWithNewMintWorksCorrectly() public depositedCollateral {
+        uint256 mintAmount = 1_000e18;
+        uint256 hf = dscEngine.calculateHealthFactor(mintAmount, dscEngine.getAccountCollateralValueInUsd(USER));
+        assertGt(hf, 0);
+    }
+
+    function testCalculateHealthFactorWithZeroDebt() public view {
+        uint256 hf = dscEngine.calculateHealthFactor(0, 1000e18);
+        assertEq(hf, type(uint256).max);
+    }
+
+    function testGetUserHealthFactorWithZeroDebt() public {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
+        dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
+
+        uint256 hf = dscEngine.getUserHealthFactor(USER);
+        assertEq(hf, type(uint256).max);
+        vm.stopPrank();
+    }
+
+    function testGetCollateralTokensReturnsCorrectTokens() public view {
+        address[] memory tokens = dscEngine.getCollateralTokens();
+        assertEq(tokens.length, 2);
+        // Перевіряємо що обидва токени присутні (порядок може бути різний)
+        assertTrue(tokens[0] == weth || tokens[0] == wbtc);
+        assertTrue(tokens[1] == weth || tokens[1] == wbtc);
+        assertTrue(tokens[0] != tokens[1]);
     }
 }
