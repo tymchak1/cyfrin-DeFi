@@ -1,19 +1,37 @@
-1) Pegged to USD
-    1. Chainlink price feed
-    2. Function to exachange ETH & BTC to USD
-2) Algorithmic
-    1. Can mint only with enough collateral
-3) Collateral - exogenous (Crypto)
-    1. wETH
-    2. wBTC
+# Decentralized Stablecoin
 
+This project is a decentralized stablecoin system designed to maintain a stable value pegged to USD. It leverages Chainlink price feeds and allows users to mint stablecoins by collateralizing crypto assets such as wETH and wBTC.
 
-1. What are our invatiants/properties?
-2. Write functions.
+## Features
 
-    fuzzing = stateless fuzzing
-    invariant = stateful fuzzing
+1. Pegged to USD
+    - Chainlink price feed integration
+    - Functions to exchange ETH & BTC to USD
+2. Algorithmic
+    - Minting only allowed with sufficient collateral
+3. Collateral - exogenous (Crypto)
+    - wETH
+    - wBTC
 
-1. Proper oracle use ✅
-2. More tests
-3. Smart Contract Audit Preparations
+## Architecture
+
+The stablecoin system consists of smart contracts that manage collateral deposits, minting, and redemption of the stablecoin. It ensures over-collateralization and uses price oracles to maintain the peg.
+
+## How it works
+
+- Users deposit collateral (wETH or wBTC).
+- The system uses Chainlink price feeds to determine the USD value of the collateral.
+- Users can mint stablecoins up to a certain collateralization ratio.
+- The system enforces algorithmic rules to maintain stability and solvency.
+
+## Testing
+
+- Fuzzing tests include:
+    - Stateless fuzzing
+    - Stateful fuzzing (invariant testing)
+
+## Installation
+
+To get started, clone the repository and install dependencies. Use Foundry or your preferred Solidity development environment to compile and test the contracts.
+
+---

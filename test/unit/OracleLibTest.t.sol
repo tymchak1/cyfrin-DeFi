@@ -17,7 +17,7 @@ contract OracleLibTest is StdCheats, Test {
         aggregator = new MockV3Aggregator(DECIMALS, INITAL_PRICE);
     }
 
-    function testGetTimeout() public {
+    function testGetTimeout() public view {
         uint256 expectedTimeout = 3 hours;
         assertEq(OracleLib.getTimeout(AggregatorV3Interface(address(aggregator))), expectedTimeout);
     }
